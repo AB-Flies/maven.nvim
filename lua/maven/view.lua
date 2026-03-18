@@ -18,7 +18,11 @@ local function find_rogue_buffer()
 end
 
 function View.create()
-  vim.cmd("below new")
+  local current_win_height = vim.api.nvim_win_get_height(0)
+  local config = require("maven.config")
+  local target_height = math.floor(current_win_height * config.options.height)
+  vim.cmd("below " .. target_height .. "new")
+
   local buf = View:new()
   buf:setup()
   return buf
@@ -52,11 +56,12 @@ function View:setup()
 
   self:set_option("filetype", "maven")
   self:set_option("bufhidden", "wipe")
-  self:set_option("buftype", "nofile")
+  -- self:set_option("buftype", "nofile")
   self:set_option("swapfile", false)
   self:set_option("buflisted", false)
   self:set_option("winfixwidth", true, true)
-  self:set_option("wrap", false, true)
+  self:set_option("wrap", true, true)
+  self:set_option("linebreak", true, true)
   self:set_option("spell", false, true)
   self:set_option("list", false, true)
   self:set_option("winfixheight", true, true)
@@ -66,6 +71,8 @@ function View:setup()
   self:set_option("foldlevel", 3, true)
   self:set_option("foldenable", false, true)
   self:set_option("fcs", "eob: ", true)
+
+  self.chan = vim.api.nvim_open_term(self.buf, {})
 
   vim.api.nvim_buf_set_keymap(self.buf, "n", "q", "<cmd>close<cr>", { silent = true, noremap = true, nowait = true })
   vim.api.nvim_buf_set_keymap(
@@ -112,13 +119,14 @@ end
 
 function View:render_line(line)
   vim.schedule(function()
-    local buf_info = vim.fn.getbufinfo(self.buf)
-    if buf_info[1] ~= nil then
-      local last_line = buf_info[1].linecount
-      vim.fn.appendbufline(self.buf, last_line, line)
-      pcall(vim.api.nvim_win_set_cursor, self.win, { last_line + 1, 0 })
+    -- Add a check to ensure `line` is not nil before concatenating
+    if self.chan and line then
+      -- Terminals expect \r\n for line breaks, so we append it here
+      vim.api.nvim_chan_send(self.chan, line .. "\r\n")
+
+      -- Auto-scroll to the bottom
+      local last_line = vim.api.nvim_buf_line_count(self.buf)
+      pcall(vim.api.nvim_win_set_cursor, self.win, { last_line, 0 })
     end
   end)
 end
-
-return View
