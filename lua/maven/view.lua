@@ -130,3 +130,5 @@ function View:render_line(line)
     end
   end)
 end
+
+return View
